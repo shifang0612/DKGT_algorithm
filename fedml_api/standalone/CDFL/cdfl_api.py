@@ -51,12 +51,6 @@ class cdflAPI(object):
     def train(self):
         # initialize the local model of each node as zero
         w_global = self.model_trainer.get_model_params()
-        # new_global = {}
-        # num = 0
-        # for name, params in w_global.items():
-        #     new_global[name] = torch.zeros_like(params)
-        #     num += params.numel()
-        #w_global = new_global
         Cti_ini = {}  # record the parameter of gradient tracking
         ini_gradient_sum = {}
         zero_model={}
@@ -64,14 +58,6 @@ class cdflAPI(object):
             Cti_ini[name] = torch.zeros_like(param)
             ini_gradient_sum[name]=torch.zeros_like(param)
             zero_model[name] = torch.zeros_like(param)
-
-        # ini_gradnts=[]
-        # for clnt_idx in range(self.args.client_num_in_total):
-        #     client = self.client_list[clnt_idx]
-        #     gradnt= client.model_trainer.screen_gradients(client.local_training_data, self.device)
-        #     ini_gradnts.append(gradnt)
-        #     for name, params in self.model.named_parameters():
-        #         ini_gradient_sum[name] += gradnt[name]
 
         w_local_mdls = []
         Ct_previous=[]
@@ -90,8 +76,8 @@ class cdflAPI(object):
         for round_idx in range(self.args.comm_round):
             self.logger.info("################Communication round : {}".format(round_idx))
             round_m=int(math.floor(round_idx/self.args.tau))
-            #var_topo=topos[round_m]
-            var_topo=self.args.topo
+            var_topo=topos[round_m]
+            #var_topo=self.args.topo
             self.logger.info('topology:{}'.format(var_topo))
             #确定topology矩阵和权重矩阵
             topo_matrix=self.round_topology(round_m,self.args.client_num_in_total, var_topo)
@@ -100,12 +86,6 @@ class cdflAPI(object):
 
             # 更新communication round时的所有local model
             w_local_mdls_lstrd = copy.deepcopy(w_local_mdls)
-
-            # # 求平均模型
-            # ave_model = defaultdict(float)
-            # for local_model in w_local_mdls_lstrd:
-            #     for key, value in local_model.items():
-            #         ave_model[key] += value / self.args.client_num_in_total
 
             # 在每一个communication rounds需要进行每个client的local training
             tst_results_ths_round = [] #保存每个client本地训练完的结果
@@ -140,10 +120,7 @@ class cdflAPI(object):
             # Cur_St=st_trainer.train_round_parallel()
             ct_trainer=Cti_Trainer(self.args, self.device, self.model, Ct_previous, cur_weight_matrix, Cur_Zt)
             Cur_Ct=ct_trainer.train_round_parallel()
-            # Zt_previous = Cur_Zt
-            # St_previous = Cur_St
             Ct_previous=Cur_Ct
-            #pre_weight_matrix = cur_weight_matrix
 
             self._local_test_on_all_clients(tst_results_ths_round, round_idx)
         return
@@ -174,22 +151,22 @@ class cdflAPI(object):
             np.fill_diagonal(random_matrix, 1)
             # 使矩阵对称
             adjacency_matrix = np.triu(random_matrix, k=0) + np.triu(random_matrix, k=1).T
-            # m=20 #20为接入的数量
-            # # 确保每行为1的数的个数为m
-            # for i in range(client_num_in_total):
-            #     row_sum = np.sum(adjacency_matrix[i, :])
-            #     if row_sum > m:
-            #         # 随机选择超出m的元素置零
-            #         np.random.seed(round_m)
-            #         indices_to_zero = np.random.choice(np.where(adjacency_matrix[i, :] == 1)[0], size=row_sum - m,
-            #                                            replace=False)
-            #         adjacency_matrix[i, indices_to_zero] = 0
-            #     elif row_sum < m:
-            #         # 随机选择不足m的元素置一
-            #         np.random.seed(round_m)
-            #         indices_to_one = np.random.choice(np.where(adjacency_matrix[i, :] == 0)[0], size=m - row_sum,
-            #                                           replace=False)
-            #         adjacency_matrix[i, indices_to_one] = 1
+            m=20 #20为接入的数量
+            # 确保每行为1的数的个数为m
+            for i in range(client_num_in_total):
+                row_sum = np.sum(adjacency_matrix[i, :])
+                if row_sum > m:
+                    # 随机选择超出m的元素置零
+                    np.random.seed(round_m)
+                    indices_to_zero = np.random.choice(np.where(adjacency_matrix[i, :] == 1)[0], size=row_sum - m,
+                                                       replace=False)
+                    adjacency_matrix[i, indices_to_zero] = 0
+                elif row_sum < m:
+                    # 随机选择不足m的元素置一
+                    np.random.seed(round_m)
+                    indices_to_one = np.random.choice(np.where(adjacency_matrix[i, :] == 0)[0], size=m - row_sum,
+                                                      replace=False)
+                    adjacency_matrix[i, indices_to_one] = 1
         elif topo=="grid":
             adjacency_matrix = np.zeros((client_num_in_total, client_num_in_total))
             for i in range(client_num_in_total):
@@ -256,15 +233,6 @@ class cdflAPI(object):
         self.stat_info["final_masks"] = []
         self.stat_info["mask_dis_matrix"] = []
 
-    # def ave_model(self, local_models):
-    #     global_model = {}
-    #     for key, value in local_models[0].items():
-    #         global_model[key] = torch.zeros_like(value)
-    #     for local_model in local_models:
-    #         for key, value in local_model.items():
-    #             global_model[key] += value / len(local_models)
-    #     return global_model
-
     def cons_dis(self, local_models):
         #global_model = defaultdict(float)
         global_model = {}
@@ -284,11 +252,6 @@ class cdflAPI(object):
         average_consensus_distance = consensus_distance / len(local_models)
 
         return average_consensus_distance
-
-    # def cons_dis(self, w_model1, w_model2):
-    #     model_dif={key:w_model1[key]-w_model2[key] for key in w_model1.keys()}
-    #     dis=self.comp_norm(model_dif)
-    #     return dis
 
     def comp_norm(self, model_dist):
         total_norm = 0.0
