@@ -25,10 +25,6 @@ class Cti_Trainer:
             weight[clnt_id] * Cur_Zt[clnt_id][name].to(self.device) for clnt_id in range(self.args.client_num_in_total))
                    for name, params in self.model.named_parameters()}
 
-        # sum_Sti = {name: sum(
-        #     weight[clnt_id] * Cur_St[clnt_id][name].to(self.device) for clnt_id in range(self.args.client_num_in_total))
-        #            for name, params in self.model.named_parameters()}
-
         Cti = {k: previous_Cti[k].to(self.device) + sum_Zti[k] - Cur_Zt[cur_idx][k].to(self.device) for k in Zti.keys()}
 
         return Cti
